@@ -24,7 +24,7 @@
 		 terminate/2, code_change/3]).
 -export([subscribe/4, unsubscribe/3]).
 
--define(default_timeout, 5000). %% same as in gen.erl in stdlib
+-define(default_timeout, 50000). %% same as in gen.erl in stdlib
 
 %%%%%%%%%%%%%
 %% helpers %%
@@ -108,7 +108,7 @@ send(Client, Cmd, Timeout) ->
 		Piped ->
 			gen_server2:cast(Client, {send, Cmd});
 		true ->
-			case gen_server2:call(Client, {send, Cmd}, Timeout) of
+			case gen_server2:call(Client, {send, Cmd}, 5000000) of
 				{error, Reason} -> throw({error, Reason});
 				Retval -> Retval
 			end
@@ -429,7 +429,6 @@ parse_state(State, Socket, Data) ->
 			% begin accumulation of multi bulk reply
 			State#redis{remaining=Remaining, pstate=read};
 		{N, {read, nil}} ->
-
 			% reply with nil
 			case State#redis.pstate of
 				empty -> send_reply(State#redis{buffer=[nil]});
@@ -439,10 +438,9 @@ parse_state(State, Socket, Data) ->
 						_ -> State#redis{remaining=N, buffer=NewBuffer, pstate=read}
 					end
 			end;
-		{_, {read, 0}} when State#redis.pstate =:= empty ->
+		{_, {empty, 0}} when State#redis.pstate =:= empty ->
 			% this is needed to handle single-line reply empty responses
 			send_reply(State#redis{buffer=[]});
-
 		{0, {read, NBytes}} ->
 			% reply with Value added to buffer
 			Value = recv_value(Socket, NBytes),
